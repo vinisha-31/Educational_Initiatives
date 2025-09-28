@@ -1,0 +1,490 @@
+Virtual Classroom Manager - Full Java Implementation
+1. Domain Entities
+
+Classroom.java
+
+package virtualclassroom.domain;
+
+import java.util.*;
+
+public class Classroom {
+    private final String name;
+    private final Map<String, Student> students = new HashMap<>();
+    private final Map<String, Assignment> assignments = new HashMap<>();
+
+    public Classroom(String name) {
+        if (name == null || name.trim().isEmpty()) {
+            throw new IllegalArgumentException("Classroom name cannot be empty");
+        }
+        this.name = name;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public Collection<Student> getStudents() {
+        return Collections.unmodifiableCollection(students.values());
+    }
+
+    public Collection<Assignment> getAssignments() {
+        return Collections.unmodifiableCollection(assignments.values());
+    }
+
+    public void addStudent(Student student) {
+        if (student == null) throw new IllegalArgumentException("Student cannot be null");
+        students.putIfAbsent(student.getStudentId(), student);
+    }
+
+    public boolean hasStudent(String studentId) {
+        return students.containsKey(studentId);
+    }
+
+    public void removeStudent(String studentId) {
+        students.remove(studentId);
+    }
+
+    public void addAssignment(Assignment assignment) {
+        if (assignment == null) throw new IllegalArgumentException("Assignment cannot be null");
+        assignments.putIfAbsent(assignment.getDetails(), assignment);
+    }
+
+    public Assignment getAssignment(String details) {
+        return assignments.get(details);
+    }
+
+    public void removeAssignment(String details) {
+        assignments.remove(details);
+    }
+}
+
+
+Student.java
+
+package virtualclassroom.domain;
+
+import java.util.Objects;
+
+public class Student {
+    private final String studentId;
+
+    public Student(String studentId) {
+        if (studentId == null || studentId.trim().isEmpty()) {
+            throw new IllegalArgumentException("Student ID cannot be empty");
+        }
+        this.studentId = studentId;
+    }
+
+    public String getStudentId() {
+        return studentId;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof Student)) return false;
+        Student student = (Student) o;
+        return studentId.equals(student.studentId);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(studentId);
+    }
+}
+
+
+Assignment.java
+
+package virtualclassroom.domain;
+
+import java.util.HashSet;
+import java.util.Set;
+
+public class Assignment {
+    private final String details;
+    private final Set<String> submittedStudentIds = new HashSet<>();
+
+    public Assignment(String details) {
+        if (details == null || details.trim().isEmpty()) {
+            throw new IllegalArgumentException("Assignment details cannot be empty");
+        }
+        this.details = details;
+    }
+
+    public String getDetails() {
+        return details;
+    }
+
+    public boolean submit(String studentId) {
+        if (studentId == null || studentId.trim().isEmpty()) {
+            throw new IllegalArgumentException("Student ID cannot be empty");
+        }
+        return submittedStudentIds.add(studentId);
+    }
+
+    public boolean hasSubmitted(String studentId) {
+        return submittedStudentIds.contains(studentId);
+    }
+}
+
+2. Repository Layer (In-memory Data Store)
+
+ClassroomRepository.java
+
+package virtualclassroom.repository;
+
+import virtualclassroom.domain.Classroom;
+
+import java.util.*;
+
+public class ClassroomRepository {
+    private final Map<String, Classroom> classrooms = new HashMap<>();
+
+    public void addClassroom(Classroom classroom) {
+        if (classroom == null) throw new IllegalArgumentException("Classroom cannot be null");
+        if (classrooms.containsKey(classroom.getName())) {
+            throw new IllegalArgumentException("Classroom with name '" + classroom.getName() + "' already exists.");
+        }
+        classrooms.put(classroom.getName(), classroom);
+    }
+
+    public Classroom getClassroom(String name) {
+        return classrooms.get(name);
+    }
+
+    public Collection<Classroom> getAllClassrooms() {
+        return Collections.unmodifiableCollection(classrooms.values());
+    }
+
+    public void removeClassroom(String name) {
+        classrooms.remove(name);
+    }
+
+    public boolean exists(String name) {
+        return classrooms.containsKey(name);
+    }
+}
+
+3. Services (Business Logic)
+
+ClassroomService.java
+
+package virtualclassroom.service;
+
+import virtualclassroom.domain.Classroom;
+import virtualclassroom.domain.Student;
+import virtualclassroom.domain.Assignment;
+import virtualclassroom.repository.ClassroomRepository;
+import virtualclassroom.util.Logger;
+
+import java.util.Collection;
+
+public class ClassroomService {
+
+    private final ClassroomRepository classroomRepository;
+    private final Logger logger = Logger.getInstance();
+
+    public ClassroomService(ClassroomRepository classroomRepository) {
+        this.classroomRepository = classroomRepository;
+    }
+
+    public void addClassroom(String name) {
+        if (classroomRepository.exists(name)) {
+            throw new IllegalArgumentException("Classroom already exists with name: " + name);
+        }
+        Classroom classroom = new Classroom(name);
+        classroomRepository.addClassroom(classroom);
+        logger.log("Classroom added: " + name);
+    }
+
+    public void removeClassroom(String name) {
+        if (!classroomRepository.exists(name)) {
+            throw new IllegalArgumentException("Classroom does not exist: " + name);
+        }
+        classroomRepository.removeClassroom(name);
+        logger.log("Classroom removed: " + name);
+    }
+
+    public Collection<Classroom> listClassrooms() {
+        return classroomRepository.getAllClassrooms();
+    }
+
+    public void addStudentToClassroom(String studentId, String classroomName) {
+        Classroom classroom = classroomRepository.getClassroom(classroomName);
+        if (classroom == null) {
+            throw new IllegalArgumentException("Classroom does not exist: " + classroomName);
+        }
+        if (classroom.hasStudent(studentId)) {
+            throw new IllegalArgumentException("Student already enrolled: " + studentId);
+        }
+        classroom.addStudent(new Student(studentId));
+        logger.log("Student " + studentId + " added to classroom " + classroomName);
+    }
+
+    public Collection<Student> listStudentsInClassroom(String classroomName) {
+        Classroom classroom = classroomRepository.getClassroom(classroomName);
+        if (classroom == null) {
+            throw new IllegalArgumentException("Classroom does not exist: " + classroomName);
+        }
+        return classroom.getStudents();
+    }
+
+    public void scheduleAssignment(String classroomName, String assignmentDetails) {
+        Classroom classroom = classroomRepository.getClassroom(classroomName);
+        if (classroom == null) {
+            throw new IllegalArgumentException("Classroom does not exist: " + classroomName);
+        }
+        if (classroom.getAssignment(assignmentDetails) != null) {
+            throw new IllegalArgumentException("Assignment already scheduled: " + assignmentDetails);
+        }
+        classroom.addAssignment(new Assignment(assignmentDetails));
+        logger.log("Assignment scheduled: " + assignmentDetails + " for classroom " + classroomName);
+    }
+
+    public void submitAssignment(String studentId, String classroomName, String assignmentDetails) {
+        Classroom classroom = classroomRepository.getClassroom(classroomName);
+        if (classroom == null) {
+            throw new IllegalArgumentException("Classroom does not exist: " + classroomName);
+        }
+        if (!classroom.hasStudent(studentId)) {
+            throw new IllegalArgumentException("Student not enrolled in classroom: " + studentId);
+        }
+        Assignment assignment = classroom.getAssignment(assignmentDetails);
+        if (assignment == null) {
+            throw new IllegalArgumentException("Assignment not found: " + assignmentDetails);
+        }
+        if (assignment.hasSubmitted(studentId)) {
+            throw new IllegalArgumentException("Assignment already submitted by student: " + studentId);
+        }
+        assignment.submit(studentId);
+        logger.log("Assignment submitted by student " + studentId + " in classroom " + classroomName);
+    }
+}
+
+4. Logger (Singleton)
+
+Logger.java
+
+package virtualclassroom.util;
+
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+
+public final class Logger {
+    private static volatile Logger instance;
+
+    private Logger() {}
+
+    public static Logger getInstance() {
+        if (instance == null) {
+            synchronized(Logger.class) {
+                if (instance == null) instance = new Logger();
+            }
+        }
+        return instance;
+    }
+
+    public void log(String message) {
+        String timestamp = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+        System.out.println("[" + timestamp + "] " + message);
+    }
+}
+
+5. Command Pattern for User Commands
+
+Command.java
+
+package virtualclassroom.command;
+
+public interface Command {
+    void execute(String[] args);
+}
+
+
+AddClassroomCommand.java
+
+package virtualclassroom.command;
+
+import virtualclassroom.service.ClassroomService;
+
+public class AddClassroomCommand implements Command {
+    private final ClassroomService classroomService;
+
+    public AddClassroomCommand(ClassroomService classroomService) {
+        this.classroomService = classroomService;
+    }
+
+    @Override
+    public void execute(String[] args) {
+        if (args.length < 2) {
+            System.out.println("Usage: add_classroom <ClassName>");
+            return;
+        }
+        String className = args[1].trim();
+        try {
+            classroomService.addClassroom(className);
+            System.out.println("Classroom [" + className + "] has been created.");
+        } catch (IllegalArgumentException ex) {
+            System.out.println("Error: " + ex.getMessage());
+        }
+    }
+}
+
+
+Similarly, for other commands:
+
+AddStudentCommand.java
+
+package virtualclassroom.command;
+
+import virtualclassroom.service.ClassroomService;
+
+public class AddStudentCommand implements Command {
+    private final ClassroomService classroomService;
+
+    public AddStudentCommand(ClassroomService classroomService) {
+        this.classroomService = classroomService;
+    }
+
+    @Override
+    public void execute(String[] args) {
+        if (args.length < 3) {
+            System.out.println("Usage: add_student <StudentID> <ClassName>");
+            return;
+        }
+        String studentId = args[1].trim();
+        String className = args[2].trim();
+        try {
+            classroomService.addStudentToClassroom(studentId, className);
+            System.out.println("Student [" + studentId + "] has been enrolled in [" + className + "].");
+        } catch (IllegalArgumentException ex) {
+            System.out.println("Error: " + ex.getMessage());
+        }
+    }
+}
+
+
+ScheduleAssignmentCommand.java
+
+package virtualclassroom.command;
+
+import virtualclassroom.service.ClassroomService;
+
+public class ScheduleAssignmentCommand implements Command {
+    private final ClassroomService classroomService;
+
+    public ScheduleAssignmentCommand(ClassroomService classroomService) {
+        this.classroomService = classroomService;
+    }
+
+    @Override
+    public void execute(String[] args) {
+        if (args.length < 3) {
+            System.out.println("Usage: schedule_assignment <ClassName> <AssignmentDetails>");
+            return;
+        }
+        String className = args[1].trim();
+        String assignmentDetails = args[2].trim();
+
+        try {
+            classroomService.scheduleAssignment(className, assignmentDetails);
+            System.out.println("Assignment for [" + className + "] has been scheduled.");
+        } catch (IllegalArgumentException ex) {
+            System.out.println("Error: " + ex.getMessage());
+        }
+    }
+}
+
+
+SubmitAssignmentCommand.java
+
+package virtualclassroom.command;
+
+import virtualclassroom.service.ClassroomService;
+
+public class SubmitAssignmentCommand implements Command {
+    private final ClassroomService classroomService;
+
+    public SubmitAssignmentCommand(ClassroomService classroomService) {
+        this.classroomService = classroomService;
+    }
+
+    @Override
+    public void execute(String[] args) {
+        if (args.length < 4) {
+            System.out.println("Usage: submit_assignment <StudentID> <ClassName> <AssignmentDetails>");
+            return;
+        }
+        String studentId = args[1].trim();
+        String className = args[2].trim();
+        String assignmentDetails = args[3].trim();
+
+        try {
+            classroomService.submitAssignment(studentId, className, assignmentDetails);
+            System.out.println("Assignment submitted by Student [" + studentId + "] in [" + className + "].");
+        } catch (IllegalArgumentException ex) {
+            System.out.println("Error: " + ex.getMessage());
+        }
+    }
+}
+
+6. Main Application (Console Loop)
+package virtualclassroom;
+
+import virtualclassroom.command.*;
+import virtualclassroom.repository.ClassroomRepository;
+import virtualclassroom.service.ClassroomService;
+import virtualclassroom.util.Logger;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Scanner;
+
+public class Main {
+    public static void main(String[] args) {
+        Logger logger = Logger.getInstance();
+        ClassroomRepository classroomRepository = new ClassroomRepository();
+        ClassroomService classroomService = new ClassroomService(classroomRepository);
+
+        Map<String, Command> commandMap = new HashMap<>();
+        commandMap.put("add_classroom", new AddClassroomCommand(classroomService));
+        commandMap.put("add_student", new AddStudentCommand(classroomService));
+        commandMap.put("schedule_assignment", new ScheduleAssignmentCommand(classroomService));
+        commandMap.put("submit_assignment", new SubmitAssignmentCommand(classroomService));
+
+        Scanner scanner = new Scanner(System.in);
+        logger.log("Virtual Classroom Manager started. Type 'exit' to quit.");
+
+        boolean running = true;
+        while (running) {
+            System.out.print("> ");
+            String input = scanner.nextLine().trim();
+            if (input.equalsIgnoreCase("exit")) {
+                running = false;
+                logger.log("Virtual Classroom Manager exiting.");
+                System.out.println("Goodbye!");
+                break;
+            }
+            if (input.isEmpty()) continue;
+
+            // Split by whitespace but support assignment details with spaces - limit split count
+            String[] tokens = input.split("\\s+", 4); 
+
+            String commandKey = tokens[0].toLowerCase();
+            Command command = commandMap.get(commandKey);
+
+            if (command == null) {
+                System.out.println("Unknown command: " + commandKey);
+                continue;
+            }
+            try {
+                command.execute(tokens);
+            } catch (Exception ex) {
+                System.out.println("Error executing command: " + ex.getMessage());
+                logger.log("Error executing command '" + commandKey + "': " + ex.getMessage());
+            }
+        }
+        scanner.close();
+    }
+}
