@@ -1,0 +1,93 @@
+a) Adapter Pattern — Legacy Payment Gateway Integration
+// ILegacyPaymentGateway.java
+public interface ILegacyPaymentGateway {
+    void makePayment(double amount);
+}
+
+// LegacyPaymentGateway.java (third party)
+public class LegacyPaymentGateway implements ILegacyPaymentGateway {
+    @Override
+    public void makePayment(double amount) {
+        System.out.println("Legacy gateway processing payment of $" + amount);
+    }
+}
+
+// INewPaymentGateway.java
+public interface INewPaymentGateway {
+    void processPayment(double amount);
+}
+
+// LegacyPaymentGatewayAdapter.java
+import java.util.Objects;
+
+public class LegacyPaymentGatewayAdapter implements INewPaymentGateway {
+    private final ILegacyPaymentGateway legacyGateway;
+
+    public LegacyPaymentGatewayAdapter(ILegacyPaymentGateway legacyGateway) {
+        this.legacyGateway = Objects.requireNonNull(legacyGateway, "Legacy gateway cannot be null");
+    }
+
+    @Override
+    public void processPayment(double amount) {
+        legacyGateway.makePayment(amount);
+    }
+}
+
+b) Decorator Pattern — User Profile Features
+// IUserProfile.java
+public interface IUserProfile {
+    String getDescription();
+    double getCost();
+}
+
+// BasicUserProfile.java
+public class BasicUserProfile implements IUserProfile {
+    @Override
+    public String getDescription() {
+        return "Basic User Profile";
+    }
+
+    @Override
+    public double getCost() {
+        return 10.0;
+    }
+}
+
+// UserProfileDecorator.java
+import java.util.Objects;
+
+public abstract class UserProfileDecorator implements IUserProfile {
+    protected final IUserProfile userProfile;
+
+    protected UserProfileDecorator(IUserProfile userProfile) {
+        this.userProfile = Objects.requireNonNull(userProfile, "UserProfile cannot be null");
+    }
+
+    @Override
+    public String getDescription() {
+        return userProfile.getDescription();
+    }
+
+    @Override
+    public double getCost() {
+        return userProfile.getCost();
+    }
+}
+
+// PremiumFeatureDecorator.java
+public class PremiumFeatureDecorator extends UserProfileDecorator {
+    public PremiumFeatureDecorator(IUserProfile userProfile) {
+        super(userProfile);
+    }
+
+    @Override
+    public String getDescription() {
+        return userProfile.getDescription() + ", Premium Feature";
+    }
+
+    @Override
+    public double getCost() {
+        return userProfile.getCost() + 20.0;
+    }
+}
+
