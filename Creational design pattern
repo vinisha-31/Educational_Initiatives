@@ -1,0 +1,76 @@
+a)Singleton pattern-Logger
+// Logger.java
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+
+public class Logger {
+    private static volatile Logger instance;
+
+    private Logger() {
+        // Initialize logging resources if needed
+    }
+
+    public static Logger getInstance() {
+        if (instance == null) {
+            synchronized (Logger.class) {
+                if (instance == null) {
+                    instance = new Logger();
+                }
+            }
+        }
+        return instance;
+    }
+
+    public void log(String message) {
+        if (message == null || message.trim().isEmpty())
+            throw new IllegalArgumentException("Log message cannot be null or empty");
+        String time = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+        System.out.println("[" + time + "] " + message);
+        // Extend to log to file, external service, etc.
+    }
+}
+
+b)Factory method pattern-Document creator
+
+// Document.java
+public abstract class Document {
+    public abstract void print();
+}
+
+// PdfDocument.java
+public class PdfDocument extends Document {
+    @Override
+    public void print() {
+        System.out.println("Printing PDF document...");
+    }
+}
+
+// WordDocument.java
+public class WordDocument extends Document {
+    @Override
+    public void print() {
+        System.out.println("Printing Word document...");
+    }
+}
+
+// DocumentFactory.java
+public abstract class DocumentFactory {
+    public abstract Document createDocument();
+}
+
+// PdfDocumentFactory.java
+public class PdfDocumentFactory extends DocumentFactory {
+    @Override
+    public Document createDocument() {
+        return new PdfDocument();
+    }
+}
+
+// WordDocumentFactory.java
+public class WordDocumentFactory extends DocumentFactory {
+    @Override
+    public Document createDocument() {
+        return new WordDocument();
+    }
+}
+
